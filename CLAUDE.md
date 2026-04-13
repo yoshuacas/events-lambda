@@ -111,7 +111,7 @@ events-lambda/
 6. **Fire-and-forget publishing.** The publish call should not block the write response. Use non-blocking HTTP POST to AppSync Events. If publish fails, the write still succeeds.
 7. **AppSync Events manages all WebSocket complexity.** This library never manages connections, connection tables, or fan-out. AppSync handles that.
 8. **Cedar authorization for channel subscriptions.** Subscribe permissions are enforced — not every user can subscribe to every table's changes.
-9. **Channel naming convention is a contract.** Channel names follow a strict pattern: `/db/{schema}.{table}.{event}` for postgres_changes, `/broadcast/{channel}` for broadcast, `/presence/{channel}` for presence. This convention is shared between publisher and adapter.
+9. **Channel naming convention is a contract.** Channel names use path segments (not dots — AppSync segments only allow `[A-Za-z0-9-]`). Pattern: `/db/{schema}/{table}/{event}` for postgres_changes, `/broadcast/{channel}/{event}` for broadcast, `/presence/{channel}` for presence. Underscores in names are mapped to dashes. This convention is shared between publisher and adapter via `shared/protocol.mjs`.
 
 ## AppSync Events Integration
 
