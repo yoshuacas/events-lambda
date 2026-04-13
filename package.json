@@ -1,0 +1,41 @@
+{
+  "name": "events-lambda",
+  "version": "0.1.0",
+  "description": "Supabase-compatible real-time events on AWS AppSync Events",
+  "type": "module",
+  "exports": {
+    ".": "./src/publisher/index.mjs",
+    "./adapter": "./src/adapter/index.mjs"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yoshuacas/events-lambda.git"
+  },
+  "keywords": [
+    "supabase",
+    "realtime",
+    "websocket",
+    "appsync",
+    "lambda",
+    "serverless",
+    "events",
+    "supabase-compatible"
+  ],
+  "dependencies": {
+    "@aws-crypto/sha256-js": "^5.0.0",
+    "@smithy/signature-v4": "^3.0.0",
+    "@aws-sdk/credential-provider-node": "^3.0.0"
+  },
+  "peerDependencies": {
+    "ws": "^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ws": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "test": "node --test 'src/**/*.test.mjs'"
+  }
+}
