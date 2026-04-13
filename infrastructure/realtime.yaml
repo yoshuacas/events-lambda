@@ -1,0 +1,127 @@
+# AppSync Events API for events-lambda real-time push notifications.
+#
+# This is a SAM template snippet — merge these resources and
+# outputs into your main stack template. It defines:
+#
+#   - An AppSync Events API with three channel namespaces
+#     (db, broadcast, presence)
+#   - Auth: IAM publish on /db/*, Cognito publish+subscribe
+#     on /broadcast/* and /presence/*
+#   - An IAM policy granting appsync:EventPublish to the
+#     Lambda execution role
+#   - Environment variables for Lambda functions to locate
+#     the API endpoints
+#
+# Parameters assumed from the parent stack:
+#   ProjectName  — stack naming prefix
+#   UserPool     — Cognito User Pool ID (for subscribe auth)
+#
+# The Lambda runtime reads the region from REGION_NAME (not
+# AWS_REGION, which is reserved by the Lambda runtime).
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+
+  # -------------------------------------------------------
+  # AppSync Events API
+  # -------------------------------------------------------
+  RealtimeApi:
+    Type: AWS::AppSync::Api
+    Properties:
+      Name: !Sub "${ProjectName}-realtime"
+      EventConfig:
+        AuthProviders:
+          - AuthType: AMAZON_COGNITO_USER_POOLS
+            CognitoConfig:
+              UserPoolId: !Ref UserPool
+              AwsRegion: !Ref AWS::Region
+          - AuthType: AWS_IAM
+        ConnectionAuthModes:
+          - AuthType: AMAZON_COGNITO_USER_POOLS
+        DefaultPublishAuthModes:
+          - AuthType: AWS_IAM
+        DefaultSubscribeAuthModes:
+          - AuthType: AMAZON_COGNITO_USER_POOLS
+
+  # -------------------------------------------------------
+  # Channel Namespaces
+  # -------------------------------------------------------
+
+  # /db/* — postgres_changes events.
+  # Publish: IAM only (Lambda execution role).
+  # Subscribe: Cognito (authenticated users).
+  # Uses the API-level defaults, so no auth overrides needed.
+  DbChannelNamespace:
+    Type: AWS::AppSync::ChannelNamespace
+    Properties:
+      ApiId: !GetAtt RealtimeApi.ApiId
+      Name: db
+
+  # /broadcast/* — client-to-client pub/sub.
+  # Both publish and subscribe use Cognito auth so clients
+  # can send directly over the WebSocket without Lambda.
+  BroadcastChannelNamespace:
+    Type: AWS::AppSync::ChannelNamespace
+    Properties:
+      ApiId: !GetAtt RealtimeApi.ApiId
+      Name: broadcast
+      PublishAuthModes:
+        - AuthType: AMAZON_COGNITO_USER_POOLS
+      SubscribeAuthModes:
+        - AuthType: AMAZON_COGNITO_USER_POOLS
+
+  # /presence/* — client-side presence tracking.
+  # Both publish and subscribe use Cognito auth.
+  PresenceChannelNamespace:
+    Type: AWS::AppSync::ChannelNamespace
+    Properties:
+      ApiId: !GetAtt RealtimeApi.ApiId
+      Name: presence
+      PublishAuthModes:
+        - AuthType: AMAZON_COGNITO_USER_POOLS
+      SubscribeAuthModes:
+        - AuthType: AMAZON_COGNITO_USER_POOLS
+
+  # -------------------------------------------------------
+  # IAM Policy — Lambda publish permission
+  # -------------------------------------------------------
+  RealtimePublishPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Allows Lambda to publish events to the AppSync Events API
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - appsync:EventPublish
+            Resource:
+              - !Sub "arn:aws:appsync:${AWS::Region}:${AWS::AccountId}:apis/${RealtimeApi.ApiId}/*"
+
+# ---------------------------------------------------------
+# Outputs — reference these from Lambda function config
+# ---------------------------------------------------------
+Outputs:
+
+  RealtimeApiId:
+    Description: AppSync Events API ID
+    Value: !GetAtt RealtimeApi.ApiId
+
+  # HTTP endpoint for server-side publishing (SigV4-signed POST)
+  RealtimeHttpEndpoint:
+    Description: AppSync Events HTTP endpoint
+    Value: !GetAtt RealtimeApi.Dns.Http
+
+  # WebSocket endpoint for client-side subscriptions
+  RealtimeWsEndpoint:
+    Description: AppSync Events WebSocket endpoint
+    Value: !GetAtt RealtimeApi.Dns.Realtime
+
+  # Snippet for Lambda function environment variables:
+  #
+  #   Environment:
+  #     Variables:
+  #       APPSYNC_EVENTS_ENDPOINT: !GetAtt RealtimeApi.Dns.Http
+  #       APPSYNC_EVENTS_REALTIME: !GetAtt RealtimeApi.Dns.Realtime
